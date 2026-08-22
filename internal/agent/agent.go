@@ -40,7 +40,7 @@ func Prompt(prompt string) string {
 		openai.UserMessage(prompt),
 	}
 
-	for _ = range 5 {
+	for _ = range MaxSteps {
 		completion, err := client.Chat.Completions.New(
 			context.Background(),
 			openai.ChatCompletionNewParams{
