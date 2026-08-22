@@ -12,6 +12,7 @@ import (
 )
 
 type model struct {
+	agent     agent.Agent
 	textInput textinput.Model
 	spinner   spinner.Model
 	history   []string
@@ -19,16 +20,29 @@ type model struct {
 	pending   bool
 }
 
-type responseMsg string
+type agentResponseMsg string
+type agentErrorMsg string
 
-func prompt(prompt string) tea.Cmd {
+func errorHistoryStyle(str string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Red).Render(str)
+}
+
+func responseHistoryStyle(str string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#cccccc")).Render(str)
+}
+
+func (m model) prompt(prompt string) tea.Cmd {
 	return func() tea.Msg {
-		res := agent.Prompt(prompt)
-		return responseMsg(res)
+		res, err := m.agent.Prompt(prompt)
+		if err != nil {
+			return agentErrorMsg(err.Error())
+		} else {
+			return agentResponseMsg(res)
+		}
 	}
 }
 
-func initialModel() model {
+func initialModel(agent agent.Agent) model {
 	ti := textinput.New()
 	ti.Placeholder = "Ask something"
 	ti.Focus()
@@ -43,7 +57,7 @@ func initialModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	return model{textInput: ti, spinner: s, history: history, viewPort: vp, pending: false}
+	return model{textInput: ti, spinner: s, history: history, viewPort: vp, pending: false, agent: agent}
 }
 
 func (m model) Init() tea.Cmd {
@@ -55,8 +69,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 
-	case responseMsg:
-		m.history = append(m.history, string(msg))
+	case agentResponseMsg:
+		m.history = append(m.history, responseHistoryStyle(string(msg)))
+		m.pending = false
+		m.viewPort.SetContent(strings.Join(m.history, "\n\n") + "\n")
+		m.viewPort.GotoBottom()
+	case agentErrorMsg:
+		m.history = append(m.history, errorHistoryStyle(string(msg)))
 		m.pending = false
 		m.viewPort.SetContent(strings.Join(m.history, "\n\n") + "\n")
 		m.viewPort.GotoBottom()
@@ -74,7 +93,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewPort.GotoBottom()
 
 			cmds = append(cmds, m.spinner.Tick)
-			cmds = append(cmds, prompt(m.textInput.Value()))
+			cmds = append(cmds, m.prompt(m.textInput.Value()))
 
 			m.pending = true
 			m.textInput.SetValue("")

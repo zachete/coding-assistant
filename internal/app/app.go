@@ -1,6 +1,9 @@
 package app
 
 import (
+	"coding-assistant/internal/agent"
+	"coding-assistant/internal/config"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -11,6 +14,8 @@ func NewApp() *App {
 }
 
 func (a *App) Run() {
-	p := tea.NewProgram(initialModel())
+	config := config.NewConfig()
+	agent := agent.NewAgent(config)
+	p := tea.NewProgram(initialModel(agent))
 	p.Run()
 }

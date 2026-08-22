@@ -3,54 +3,51 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"fmt"
 
+	"coding-assistant/internal/config"
 	"coding-assistant/internal/tools"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
-const DefaultModel = "gemini/gemini-3.1-flash-lite"
 const MaxSteps = 5
 
-func Prompt(prompt string) string {
-	apiKey := os.Getenv("API_KEY")
-	baseURL := os.Getenv("API_BASE_URL")
-	model := os.Getenv("AGENT_MODEL")
+type Agent struct {
+	client   openai.Client
+	registry *tools.Registry
+	model    string
+}
 
-	if apiKey == "" {
-		panic("API_KEY environment variable is not set")
+func NewAgent(config config.Config) Agent {
+	return Agent{
+		registry: tools.NewRegistry(),
+		model:    config.AgentModel,
+		client: openai.NewClient(
+			option.WithBaseURL(config.ApiBaseUrl),
+			option.WithAPIKey(config.ApiKey),
+		),
 	}
-	if baseURL == "" {
-		baseURL = "https://api.openai.com/v1"
-	}
-	if model == "" {
-		model = DefaultModel
-	}
+}
 
-	registry := tools.NewRegistry()
-	toolsList := ToOpenAITools(registry.AsSlice())
-	client := openai.NewClient(
-		option.WithBaseURL(baseURL),
-		option.WithAPIKey(apiKey),
-	)
+func (a Agent) Prompt(prompt string) (string, error) {
 	messages := []openai.ChatCompletionMessageParamUnion{
 		openai.SystemMessage("You are a senior software engineer. You help with code analyzing. You have access to tools that can read files from the codebase. When you need to analyze a file, use the read_file tool to get its content."),
 		openai.UserMessage(prompt),
 	}
 
 	for _ = range MaxSteps {
-		completion, err := client.Chat.Completions.New(
+		completion, err := a.client.Chat.Completions.New(
 			context.Background(),
 			openai.ChatCompletionNewParams{
-				Model:    model,
+				Model:    a.model,
 				Messages: messages,
-				Tools:    toolsList,
+				Tools:    ToOpenAITools(a.registry.AsSlice()),
 			},
 		)
 		if err != nil {
-			panic(err)
+			return "", fmt.Errorf("openai api error: %w", err)
 		}
 		message := completion.Choices[0].Message
 
@@ -61,7 +58,7 @@ func Prompt(prompt string) string {
 		}
 
 		for _, call := range message.ToolCalls {
-			tool, err := registry.ResolveTool(call.Function.Name)
+			tool, err := a.registry.ResolveTool(call.Function.Name)
 			if err != nil {
 				continue
 			}
@@ -69,7 +66,7 @@ func Prompt(prompt string) string {
 			var args map[string]any
 			err = json.Unmarshal([]byte(call.Function.Arguments), &args)
 			if err != nil {
-				panic(err)
+				return "", fmt.Errorf("json unmarshal error: %w", err)
 			}
 
 			content, err := tool.Execute(args)
@@ -82,5 +79,5 @@ func Prompt(prompt string) string {
 		}
 	}
 
-	return messages[len(messages)-1].OfAssistant.Content.OfString.Value
+	return messages[len(messages)-1].OfAssistant.Content.OfString.Value, nil
 }
