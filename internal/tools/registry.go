@@ -13,7 +13,8 @@ type Registry struct {
 func NewRegistry() *Registry {
 	return &Registry{
 		items: map[string]Tool{
-			"read_file": ReadFileTool{},
+			"read_file":  ReadFileTool{},
+			"write_file": WriteFileTool{},
 		},
 	}
 }

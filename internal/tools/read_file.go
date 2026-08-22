@@ -12,7 +12,7 @@ func (t ReadFileTool) Name() string {
 }
 
 func (t ReadFileTool) Description() string {
-	return "Read a file content. Use when need to read a file source code."
+	return "Read a file content. Use when need to read a file content."
 }
 
 func (t ReadFileTool) Params() map[string]any {
