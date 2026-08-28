@@ -2,104 +2,125 @@ package app
 
 import (
 	"coding-assistant/internal/agent"
+	"coding-assistant/internal/ui/confirmation"
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
+	"charm.land/glamour/v2/styles"
 	"charm.land/lipgloss/v2"
 )
 
-type model struct {
-	agent     agent.Agent
-	textInput textinput.Model
-	spinner   spinner.Model
-	history   []string
-	viewPort  viewport.Model
-	pending   bool
-}
+func initialModel(agent agent.Agent) *model {
+	const (
+		width  = 80
+		height = 20
+	)
+	greeting := `**Hallo, Hallo!**`
 
-type agentResponseMsg string
-type agentErrorMsg string
+	vp := viewport.New(viewport.WithWidth(width), viewport.WithHeight(height))
+	vp.Style = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#9c7cff")).
+		PaddingRight(2)
+	vp.KeyMap.PageDown.Unbind()
 
-func errorHistoryStyle(str string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Red).Render(str)
-}
-
-func responseHistoryStyle(str string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#cccccc")).Render(str)
-}
-
-func (m model) prompt(prompt string) tea.Cmd {
-	return func() tea.Msg {
-		res, err := m.agent.Prompt(prompt)
-		if err != nil {
-			return agentErrorMsg(err.Error())
-		} else {
-			return agentResponseMsg(res)
-		}
-	}
-}
-
-func initialModel(agent agent.Agent) model {
 	ti := textinput.New()
 	ti.Placeholder = "Ask something"
 	ti.Focus()
 	ti.Prompt = "> "
 
-	history := []string{lipgloss.NewStyle().Foreground(lipgloss.Yellow).Render("Hallo, Hallo!")}
-	vp := viewport.New(viewport.WithWidth(10), viewport.WithHeight(10))
-	vp.SetContent(history[0])
-	vp.SoftWrap = true
-
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5fef"))
 
-	return model{textInput: ti, spinner: s, history: history, viewPort: vp, pending: false, agent: agent}
+	confirm := confirmation.New()
+
+	const glamourGutter = 3
+	glamourRenderWidth := width - vp.Style.GetHorizontalFrameSize() - glamourGutter
+	style := styles.DarkStyleConfig
+	glam, _ := glamour.NewTermRenderer(
+		glamour.WithStyles(style),
+		glamour.WithWordWrap(glamourRenderWidth),
+	)
+
+	render, _ := glam.Render(greeting)
+	history := render
+
+	vp.SetContent(history)
+
+	go agent.Run()
+
+	return &model{
+		textInput:    ti,
+		spinner:      s,
+		viewPort:     vp,
+		agent:        agent,
+		confirmation: confirm,
+		glamRender:   glam,
+		history:      history,
+		pending:      false,
+	}
 }
 
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-
-	case agentResponseMsg:
-		m.history = append(m.history, responseHistoryStyle(string(msg)))
-		m.pending = false
-		m.viewPort.SetContent(strings.Join(m.history, "\n\n") + "\n")
-		m.viewPort.GotoBottom()
-	case agentErrorMsg:
-		m.history = append(m.history, errorHistoryStyle(string(msg)))
-		m.pending = false
-		m.viewPort.SetContent(strings.Join(m.history, "\n\n") + "\n")
-		m.viewPort.GotoBottom()
 	case tea.WindowSizeMsg:
 		m.textInput.SetWidth(msg.Width)
 		m.viewPort.SetWidth(msg.Width)
 		m.viewPort.SetHeight(msg.Height - 3)
-		m.textInput.SetWidth(msg.Width)
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "enter":
-			m.history = append(m.history, "-> "+m.textInput.Value())
+			if !m.confirmation.Active {
+				message := "-> " + m.textInput.Value()
+				m.history = appendToHistory(m.history, message)
 
-			m.viewPort.SetContent(strings.Join(m.history, "\n\n") + "\n")
-			m.viewPort.GotoBottom()
+				m.viewPort.GotoBottom()
+				m.viewPort.SetContent(m.history)
 
-			cmds = append(cmds, m.spinner.Tick)
-			cmds = append(cmds, m.prompt(m.textInput.Value()))
+				cmds = append(cmds, m.spinner.Tick)
+				m.agent.CmdChan <- agent.Command{Kind: agent.PromptCommand, Text: m.textInput.Value()}
 
-			m.pending = true
-			m.textInput.SetValue("")
+				m.textInput.SetValue("")
+			}
 		case "ctrl+c", "esc":
 			return m, tea.Quit
 		}
+	case agent.Event:
+		switch msg.Kind {
+		case agent.AgentResponse:
+			renderedText, _ := m.glamRender.Render(msg.Text)
+			m.history = appendToHistory(m.history, renderedText)
+			m.viewPort.SetContent(m.history)
+			m.viewPort.GotoBottom()
+			m.pending = false
+		case agent.AgentStart:
+			m.pending = true
+		case agent.AgentToolConfirm:
+			m.pending = false
+			m.confirmation.Active = true
+			m.confirmation.SetCallID(msg.ToolCall.CallID)
+			m.confirmation.SetPrompt(fmt.Sprintf("Call tool (%s?)", msg.ToolCall.Name))
+		case agent.AgentError:
+			m.history = appendToHistory(m.history, errorHistoryStyle(msg.Error.Error()))
+			m.pending = false
+			m.viewPort.SetContent(m.history)
+			m.viewPort.GotoBottom()
+		}
+	case confirmation.ConfirmYesMsg:
+		m.agent.CmdChan <- agent.Command{Kind: agent.ConfirmCommand, ToolCallID: m.confirmation.CallID}
+		m.confirmation.Active = false
 	}
 
 	var cmd tea.Cmd
@@ -111,24 +132,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.viewPort, cmd = m.viewPort.Update(msg)
 
+	if m.confirmation.Active {
+		m.confirmation, cmd = m.confirmation.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	cmd = m.listenAgent()
+	cmds = append(cmds, cmd)
+
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) View() tea.View {
+func (m *model) View() tea.View {
 	var sb strings.Builder
 	sb.WriteString(m.viewPort.View())
 	sb.WriteString("\n")
 
-	var inputOrLoader string
 	if m.pending {
-		inputOrLoader = m.spinner.View()
-	} else {
-		inputOrLoader = m.textInput.View()
-	}
+		sb.WriteString(lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), true, false, false, false).Height(1).
+			BorderForeground(lipgloss.Color("#ff5fef")).Width(m.viewPort.Width()).Render(m.spinner.View()))
 
-	sb.WriteString(lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, false, false).Height(1).
-		BorderForeground(lipgloss.Color("205")).Width(m.viewPort.Width()).Render(inputOrLoader))
+	} else if m.confirmation.Active {
+		sb.WriteString(lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), true, false, false, false).Height(1).
+			BorderForeground(lipgloss.Color("#8888bb")).Width(m.viewPort.Width()).Render(m.confirmation.View().Content))
+
+	} else {
+		sb.WriteString(lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), true, false, false, false).Height(1).
+			BorderForeground(lipgloss.Color("#ff5fef")).Width(m.viewPort.Width()).Render(m.textInput.View()))
+	}
 
 	v := tea.NewView(sb.String())
 	v.AltScreen = true

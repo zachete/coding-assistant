@@ -1,8 +1,13 @@
 # Coding Assistant
 
-A learning project for an AI-powered coding assistant with a terminal interface, built using Go, Bubble Tea, and OpenAI.
+A learning pet-project for an AI-powered coding assistant with a terminal interface, built using Go, Bubble Tea, and OpenAI.
 
-<img width="729" height="377" alt="image" src="https://github.com/user-attachments/assets/c9254b79-1cc7-4a36-b4ed-ac3eddfbf191" />
+## Supported Tools
+
+The assistant has the following tools:
+
+- `read_file`: Read the content of a file given its path.
+- `write_file`: Write content to a file given its path and content.
 
 ## How to Run
 
@@ -11,5 +16,3 @@ A learning project for an AI-powered coding assistant with a terminal interface,
    ```bash
    go run cmd/main.go
    ```
-
-

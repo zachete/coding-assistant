@@ -15,7 +15,7 @@ func NewApp() *App {
 
 func (a *App) Run() {
 	config := config.NewConfig()
-	agent := agent.NewAgent(config)
+	agent := agent.New(config)
 	p := tea.NewProgram(initialModel(agent))
 	p.Run()
 }

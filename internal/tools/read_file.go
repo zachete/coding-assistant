@@ -2,7 +2,10 @@ package tools
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 type ReadFileTool struct{}
@@ -32,9 +35,23 @@ func (t ReadFileTool) Execute(args map[string]any) (string, error) {
 		return "", errors.New("empty path")
 	}
 
-	res, err := os.ReadFile(path)
+	root, err := os.Getwd()
 	if err != nil {
-		panic("can not read the file")
+		return "", err
+	}
+
+	absPath, err := filepath.Abs(filepath.Join(root, path))
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasPrefix(absPath, root) {
+		return "", fmt.Errorf("attempt to access file outside of workspace")
+	}
+
+	res, err := os.ReadFile(absPath)
+	if err != nil {
+		return "", err
 	}
 
 	return string(res), nil

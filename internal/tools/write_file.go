@@ -2,7 +2,10 @@ package tools
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 type WriteFileTool struct{}
@@ -33,7 +36,21 @@ func (t WriteFileTool) Params() map[string]any {
 func (t WriteFileTool) Execute(args map[string]any) (string, error) {
 	path, ok := args["path"].(string)
 	if !ok {
-		return "", errors.New("empty file path")
+		return "", errors.New("empty path")
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	absPath, err := filepath.Abs(filepath.Join(root, path))
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasPrefix(absPath, root) {
+		return "", fmt.Errorf("attempt to access file outside of workspace")
 	}
 
 	content, ok := args["content"].(string)
@@ -41,8 +58,7 @@ func (t WriteFileTool) Execute(args map[string]any) (string, error) {
 		return "", errors.New("empty file content")
 	}
 
-	err := os.WriteFile(path, []byte(content), 0644)
-
+	err = os.WriteFile(absPath, []byte(content), 0644)
 	if err != nil {
 		return "", err
 	}
