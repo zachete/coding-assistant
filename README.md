@@ -2,6 +2,8 @@
 
 A learning pet-project for an AI-powered coding assistant with a terminal interface, built using Go, Bubble Tea, and OpenAI.
 
+<img width="1280" height="528" alt="coding-agent" src="https://github.com/user-attachments/assets/87635ede-969c-4f0d-8660-1cef9f7a6268" />
+
 ## Supported Tools
 
 The assistant has the following tools:
