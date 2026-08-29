@@ -10,6 +10,7 @@ The assistant has the following tools:
 
 - `read_file`: Read the content of a file given its path.
 - `write_file`: Write content to a file given its path and content.
+- `grep`: Run a full project scan by a pattern.
 
 ## How to Run
 
