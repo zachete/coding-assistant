@@ -4,21 +4,30 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
-type ReadFileTool struct{}
+type ReadFileArgs struct {
+	path string
+}
 
-func (t ReadFileTool) Name() string {
+type ReadFileTool struct {
+	rawArgs map[string]any
+	args    ReadFileArgs
+}
+
+func (t *ReadFileTool) NeedConfirm() bool {
+	return true
+}
+
+func (t *ReadFileTool) Name() string {
 	return "read_file"
 }
 
-func (t ReadFileTool) Description() string {
+func (t *ReadFileTool) Description() string {
 	return "Read a file content. Use when need to read a file content."
 }
 
-func (t ReadFileTool) Params() map[string]any {
+func (t *ReadFileTool) Params() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -29,30 +38,33 @@ func (t ReadFileTool) Params() map[string]any {
 	}
 }
 
-func (t ReadFileTool) Execute(args map[string]any) (string, error) {
-	path, ok := args["path"].(string)
-	if !ok {
-		return "", errors.New("empty path")
-	}
-
-	root, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	absPath, err := filepath.Abs(filepath.Join(root, path))
-	if err != nil {
-		return "", err
-	}
-
-	if !strings.HasPrefix(absPath, root) {
-		return "", fmt.Errorf("attempt to access file outside of workspace")
-	}
-
-	res, err := os.ReadFile(absPath)
+func (t *ReadFileTool) Execute() (string, error) {
+	res, err := os.ReadFile(t.args.path)
 	if err != nil {
 		return "", err
 	}
 
 	return string(res), nil
+}
+
+func (t *ReadFileTool) SetArgs(rawArgs map[string]any) error {
+	rawPath, ok := rawArgs["path"]
+	if !ok {
+		return errors.New("empty path")
+	}
+
+	path, err := sanitizePath(rawPath.(string))
+	if err != nil {
+		return err
+	}
+
+	t.args = ReadFileArgs{
+		path: path,
+	}
+
+	return nil
+}
+
+func (t *ReadFileTool) GetNotice() string {
+	return fmt.Sprintf(`Read file(path:"%s")`, t.args.path)
 }

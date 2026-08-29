@@ -3,6 +3,7 @@ package app
 import (
 	"coding-assistant/internal/agent"
 	"coding-assistant/internal/ui/confirmation"
+	"coding-assistant/internal/utils"
 	"fmt"
 	"strings"
 
@@ -110,8 +111,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case agent.AgentToolConfirm:
 			m.pending = false
 			m.confirmation.Active = true
-			m.confirmation.SetCallID(msg.ToolCall.CallID)
-			m.confirmation.SetPrompt(fmt.Sprintf("Call tool (%s?)", msg.ToolCall.Name))
+			m.confirmation.SetMeta(ConfirmationMeta{
+				CallID: msg.ToolCall.CallID,
+				Tool:   msg.ToolCall.Tool,
+			})
+			utils.LogToFile(m.confirmation.Meta)
+
+			m.confirmation.SetPrompt(fmt.Sprintf("Call tool (%s?)", msg.ToolCall.Tool.Name()))
 		case agent.AgentError:
 			m.history = appendToHistory(m.history, errorHistoryStyle(msg.Error.Error()))
 			m.pending = false
@@ -119,7 +125,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewPort.GotoBottom()
 		}
 	case confirmation.ConfirmYesMsg:
-		m.agent.CmdChan <- agent.Command{Kind: agent.ConfirmCommand, ToolCallID: m.confirmation.CallID}
+		utils.LogToFile(m.confirmation.Meta)
+		confirmationMeta := m.confirmation.Meta.(ConfirmationMeta)
+		m.history = appendToHistory(m.history, toolCallHistoryStyle(confirmationMeta.Tool.GetNotice()))
+		m.agent.CmdChan <- agent.Command{Kind: agent.ConfirmCommand, ToolCallID: confirmationMeta.CallID}
 		m.confirmation.Active = false
 	}
 

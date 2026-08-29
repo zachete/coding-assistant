@@ -4,21 +4,31 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
-type WriteFileTool struct{}
+type WriteToolArgs struct {
+	path    string
+	content string
+}
 
-func (t WriteFileTool) Name() string {
+type WriteFileTool struct {
+	rawArgs map[string]any
+	args    WriteToolArgs
+}
+
+func (t *WriteFileTool) NeedConfirm() bool {
+	return true
+}
+
+func (t *WriteFileTool) Name() string {
 	return "write_file"
 }
 
-func (t WriteFileTool) Description() string {
+func (t *WriteFileTool) Description() string {
 	return "Write a file content. Use when need to update the file."
 }
 
-func (t WriteFileTool) Params() map[string]any {
+func (t *WriteFileTool) Params() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -33,35 +43,39 @@ func (t WriteFileTool) Params() map[string]any {
 	}
 }
 
-func (t WriteFileTool) Execute(args map[string]any) (string, error) {
-	path, ok := args["path"].(string)
-	if !ok {
-		return "", errors.New("empty path")
-	}
-
-	root, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	absPath, err := filepath.Abs(filepath.Join(root, path))
-	if err != nil {
-		return "", err
-	}
-
-	if !strings.HasPrefix(absPath, root) {
-		return "", fmt.Errorf("attempt to access file outside of workspace")
-	}
-
-	content, ok := args["content"].(string)
-	if !ok {
-		return "", errors.New("empty file content")
-	}
-
-	err = os.WriteFile(absPath, []byte(content), 0644)
+func (t *WriteFileTool) Execute() (string, error) {
+	err := os.WriteFile(t.args.path, []byte(t.args.content), 0644)
 	if err != nil {
 		return "", err
 	}
 
 	return "", nil
+}
+
+func (t *WriteFileTool) GetNotice() string {
+	return fmt.Sprintf(`Write file(path:"%s")`, t.args.path)
+}
+
+func (t *WriteFileTool) SetArgs(rawArgs map[string]any) error {
+	rawPath, ok := rawArgs["path"]
+	if !ok {
+		return errors.New("empty path")
+	}
+
+	path, err := sanitizePath(rawPath.(string))
+	if err != nil {
+		return err
+	}
+
+	content, ok := rawArgs["content"].(string)
+	if !ok {
+		return errors.New("empty file content")
+	}
+
+	t.args = WriteToolArgs{
+		path:    path,
+		content: content,
+	}
+
+	return nil
 }

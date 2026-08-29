@@ -3,7 +3,6 @@ package agent
 import (
 	"coding-assistant/internal/config"
 	"coding-assistant/internal/tools"
-	"coding-assistant/internal/utils"
 	"fmt"
 
 	"github.com/openai/openai-go/v3"
@@ -42,18 +41,17 @@ func (a *Agent) Run() {
 				continue
 			}
 
-			res, err := call.tool.Execute(call.args)
+			res, err := call.Tool.Execute()
 			delete(a.state.toolCalls, cmd.ToolCallID)
+
 			if err != nil {
 				a.EventChan <- Event{Kind: AgentError, Error: err}
 				continue
 			}
 
 			a.state.messages = append(a.state.messages, openai.ToolMessage(res, cmd.ToolCallID))
-			utils.LogToFile("log.txt", "call tool "+cmd.ToolCallID)
 
 			a.EventChan <- a.send()
-
 		}
 	}
 }

@@ -7,10 +7,8 @@ import (
 )
 
 type ToolCall struct {
-	Name   string
 	CallID string
-	tool   tools.Tool
-	args   map[string]any
+	Tool   tools.Tool
 }
 
 type State struct {
@@ -32,6 +30,7 @@ const (
 	AgentStart EventKind = iota
 	AgentResponse
 	AgentToolConfirm
+	AgentToolCall
 	AgentFinish
 	AgentError
 )

@@ -40,15 +40,15 @@ func (a *Agent) send() Event {
 			return Event{Kind: AgentError, Error: fmt.Errorf("json unmarshal error: %w", err)}
 		}
 
+		tool.SetArgs(args)
+
 		a.state.toolCalls[call.ID] = ToolCall{
-			tool: tool,
-			args: args,
+			Tool: tool,
 		}
 
 		a.EventChan <- Event{Kind: AgentToolConfirm, ToolCall: ToolCall{
 			CallID: call.ID,
-			Name:   tool.Name(),
-			args:   args,
+			Tool:   tool,
 		}}
 	}
 

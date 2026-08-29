@@ -10,7 +10,7 @@ type ConfirmNoMsg struct{}
 
 type Model struct {
 	Prompt string
-	CallID string
+	Meta   any
 	Yes    bool
 	Active bool
 }
@@ -27,8 +27,8 @@ func (m *Model) SetPrompt(prompt string) {
 	m.Prompt = prompt
 }
 
-func (m *Model) SetCallID(callID string) {
-	m.CallID = callID
+func (m *Model) SetMeta(meta any) {
+	m.Meta = meta
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
