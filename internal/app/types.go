@@ -2,7 +2,6 @@ package app
 
 import (
 	"coding-assistant/internal/agent"
-	"coding-assistant/internal/tools"
 	"coding-assistant/internal/ui/confirmation"
 
 	"charm.land/bubbles/v2/spinner"
@@ -24,6 +23,5 @@ type model struct {
 }
 
 type ConfirmationMeta struct {
-	CallID string
-	Tool   tools.Tool
+	ToolCall agent.ToolCall
 }

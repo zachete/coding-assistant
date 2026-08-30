@@ -36,16 +36,16 @@ const (
 )
 
 type Command struct {
-	Kind       CommandKind
-	Text       string
-	ToolCallID string
+	Kind     CommandKind
+	Text     string
+	ToolCall ToolCall
 }
 
 type CommandKind int
 
 const (
 	PromptCommand CommandKind = iota
-	ConfirmCommand
+	ToolCallCommand
 )
 
 type Agent struct {

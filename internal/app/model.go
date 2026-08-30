@@ -112,23 +112,25 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pending = false
 			m.confirmation.Active = true
 			m.confirmation.SetMeta(ConfirmationMeta{
-				CallID: msg.ToolCall.CallID,
-				Tool:   msg.ToolCall.Tool,
+				ToolCall: msg.ToolCall,
 			})
 			utils.LogToFile(m.confirmation.Meta)
 
 			m.confirmation.SetPrompt(fmt.Sprintf("Call tool (%s?)", msg.ToolCall.Tool.Name()))
+		case agent.AgentToolCall:
+			m.history = appendToHistory(m.history, toolCallHistoryStyle(msg.ToolCall.Tool.GetNotice()))
+			m.viewPort.SetContent(m.history)
+			m.viewPort.GotoBottom()
 		case agent.AgentError:
 			m.history = appendToHistory(m.history, errorHistoryStyle(msg.Error.Error()))
 			m.pending = false
 			m.viewPort.SetContent(m.history)
-			m.viewPort.GotoBottom()
 		}
 	case confirmation.ConfirmYesMsg:
 		utils.LogToFile(m.confirmation.Meta)
 		confirmationMeta := m.confirmation.Meta.(ConfirmationMeta)
-		m.history = appendToHistory(m.history, toolCallHistoryStyle(confirmationMeta.Tool.GetNotice()))
-		m.agent.CmdChan <- agent.Command{Kind: agent.ConfirmCommand, ToolCallID: confirmationMeta.CallID}
+		m.history = appendToHistory(m.history, toolCallHistoryStyle(confirmationMeta.ToolCall.Tool.GetNotice()))
+		m.agent.CmdChan <- agent.Command{Kind: agent.ToolCallCommand, ToolCall: confirmationMeta.ToolCall}
 		m.confirmation.Active = false
 	}
 

@@ -43,13 +43,17 @@ func (a *Agent) send() Event {
 		tool.SetArgs(args)
 
 		a.state.toolCalls[call.ID] = ToolCall{
-			Tool: tool,
-		}
-
-		a.EventChan <- Event{Kind: AgentToolConfirm, ToolCall: ToolCall{
 			CallID: call.ID,
 			Tool:   tool,
-		}}
+		}
+
+		if tool.NeedConfirm() {
+			a.EventChan <- Event{Kind: AgentToolConfirm, ToolCall: a.state.toolCalls[call.ID]}
+		} else {
+			a.EventChan <- Event{Kind: AgentToolCall, ToolCall: a.state.toolCalls[call.ID]}
+			a.CmdChan <- Command{Kind: ToolCallCommand, ToolCall: a.state.toolCalls[call.ID]}
+		}
+
 	}
 
 	return Event{Kind: AgentFinish}

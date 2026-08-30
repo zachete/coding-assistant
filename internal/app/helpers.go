@@ -8,7 +8,8 @@ func errorHistoryStyle(str string) string {
 
 func toolCallHistoryStyle(str string) string {
 	var greenPoint = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("•")
-	return greenPoint + " " + str
+	var text = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")).Render(str)
+	return greenPoint + " " + text
 }
 
 func appendToHistory(input string, str string) string {

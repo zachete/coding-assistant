@@ -16,7 +16,7 @@ type ReadFileTool struct {
 }
 
 func (t *ReadFileTool) NeedConfirm() bool {
-	return true
+	return false
 }
 
 func (t *ReadFileTool) Name() string {
